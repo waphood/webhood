@@ -9,6 +9,14 @@ import {
   doc, getDoc, getDocs, setDoc, deleteDoc,
   collection, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD0mUzcWmqcITrXwSPV2rt63drNqE5_fu8",
@@ -20,8 +28,38 @@ const firebaseConfig = {
   measurementId: "G-ED4VC0DH72"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getFirestore(app);
+const auth = getAuth(app);
+
+// ── Firebase Auth API ───────────────────────────────────────────────────────
+
+export async function firebaseRegister(email, password) {
+  const cred = await createUserWithEmailAndPassword(auth, email, password);
+  await sendEmailVerification(cred.user);
+  return cred.user;
+}
+
+export async function firebaseLogin(email, password) {
+  const cred = await signInWithEmailAndPassword(auth, email, password);
+  if (!cred.user.emailVerified) {
+    await signOut(auth);
+    throw new Error("Подтверди email — письмо отправлено при регистрации. Проверь папку Спам.");
+  }
+  return cred.user;
+}
+
+export async function firebaseLogout() {
+  await signOut(auth);
+}
+
+export function onAuthChanged(cb) {
+  return onAuthStateChanged(auth, cb);
+}
+
+export function getCurrentFirebaseUser() {
+  return auth.currentUser;
+}
 
 // ── Локальные кэши (не видны из консоли) ───────────────────────────────────
 let usersCache  = {};

@@ -1,85 +1,33 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// FIREBASE SECURITY RULES — webhood
-// ═══════════════════════════════════════════════════════════════════════════
-//
-// КАК ПРИМЕНИТЬ:
-// 1. Открой https://console.firebase.google.com
-// 2. Выбери проект webhood-4469e
-// 3. Firestore Database → вкладка "Rules"
-// 4. Замени всё содержимое на код ниже
-// 5. Нажми "Publish"
-//
-// ═══════════════════════════════════════════════════════════════════════════
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Коллекция users ──────────────────────────────────────────────────
     match /users/{userId} {
-
-      // Читать профили может кто угодно (необходимо для explore и профилей)
       allow read: if true;
 
-      // Создать профиль: только если такого документа ещё нет
-      // Это не даёт перезаписать чужой профиль при регистрации
-      allow create: if !exists(/databases/$(database)/documents/users/$(userId))
-                    && isValidUser(request.resource.data, userId);
+      allow create: if request.auth != null
+                    && !exists(/databases/$(database)/documents/users/$(userId))
+                    && request.resource.data.firebaseUid == request.auth.uid;
 
-      // Обновить: только если документ существует и данные валидны
-      // Нельзя менять поля verified, banned через клиент
-      allow update: if exists(/databases/$(database)/documents/users/$(userId))
-                    && isValidUserUpdate(request.resource.data, resource.data);
+      allow update: if request.auth != null
+                    && resource.data.firebaseUid == request.auth.uid
+                    && request.resource.data.firebaseUid == resource.data.firebaseUid
+                    && request.resource.data.verified == resource.data.verified
+                    && request.resource.data.banned == resource.data.banned
+                    && request.resource.data.username == resource.data.username
+                    && request.resource.data.createdAt == resource.data.createdAt;
 
-      // Удалять профили через клиент — ЗАПРЕЩЕНО
-      // Удаление только через Admin SDK (с бэкенда)
       allow delete: if false;
     }
 
-    // ── Коллекция meta (бейджики) ────────────────────────────────────────
     match /meta/{docId} {
-      // Читать мета может кто угодно (бейджики отображаются всем)
       allow read: if true;
-
-      // Записывать мета нельзя через клиент
-      // (бейджики редактируются через admin panel, которая не использует клиентские rules)
-      // Если хочешь разрешить — убери false и добавь логику
-      allow write: if false;
-
-      // Полностью запрещаем удаление
+      allow write: if true;
       allow delete: if false;
     }
 
-    // ── Все остальные коллекции — запрещено ─────────────────────────────
     match /{document=**} {
       allow read, write: if false;
-    }
-
-    // ── Вспомогательные функции ──────────────────────────────────────────
-
-    // Проверяем что новый пользователь содержит обязательные поля
-    function isValidUser(data, userId) {
-      return data.username == userId
-          && data.username is string
-          && data.username.size() >= 2
-          && data.username.size() <= 24
-          && data.displayName is string
-          && data.displayName.size() > 0
-          && data.password is string
-          // Поля verified и banned нельзя выставить при регистрации
-          && (!('verified' in data) || data.verified == false)
-          && (!('banned' in data) || data.banned == false);
-    }
-
-    // Проверяем что обновление не трогает защищённые поля
-    function isValidUserUpdate(newData, oldData) {
-      // Нельзя поменять verified и banned (они выставляются только из admin panel)
-      return newData.verified == oldData.verified
-          && newData.banned == oldData.banned
-          // Нельзя поменять username
-          && newData.username == oldData.username
-          // Нельзя поменять дату регистрации
-          && newData.createdAt == oldData.createdAt;
     }
   }
 }

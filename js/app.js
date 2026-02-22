@@ -104,20 +104,23 @@ function showError(el, msg) {
 async function register() {
   const username    = document.getElementById("regUsername").value.trim().toLowerCase();
   const displayName = document.getElementById("regDisplayName").value.trim();
+  const email       = document.getElementById("regEmail").value.trim().toLowerCase();
   const password    = document.getElementById("regPassword").value;
   const err         = document.getElementById("regError");
   const btn         = document.querySelector("#registerModal .btn-accent");
 
   try {
     if (btn) { btn.disabled = true; btn.textContent = "создаём..."; }
-    await _register({ username, displayName, password });
+    await _register({ username, displayName, email, password });
     closeModal("registerModal");
-    updateNavLoggedIn();
-    showScreen("dashboard");
-    toast("Профиль создан. Добро пожаловать.", "success");
-    updateLandingStats();
+    // Показываем сообщение о подтверждении почты
+    toast("📧 Письмо отправлено на " + email + " — подтверди почту и войди!", "success");
   } catch(e) {
-    showError(err, e.message || "Ошибка, попробуй ещё раз");
+    let msg = e.message || "Ошибка, попробуй ещё раз";
+    if (msg.includes("email-already-in-use")) msg = "Этот email уже зарегистрирован";
+    if (msg.includes("invalid-email"))        msg = "Неверный формат email";
+    if (msg.includes("weak-password"))        msg = "Пароль слишком простой";
+    showError(err, msg);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "создать профиль"; }
   }
@@ -125,20 +128,25 @@ async function register() {
 
 // ── Вход ─────────────────────────────────────────────────────────────────────
 async function login() {
-  const username = document.getElementById("loginUsername").value.trim().toLowerCase();
+  const email    = document.getElementById("loginEmail").value.trim().toLowerCase();
   const password = document.getElementById("loginPassword").value;
   const err      = document.getElementById("loginError");
   const btn      = document.querySelector("#loginModal .btn-accent");
 
   try {
     if (btn) { btn.disabled = true; btn.textContent = "входим..."; }
-    await _login({ username, password });
+    await _login({ email, password });
     closeModal("loginModal");
     updateNavLoggedIn();
     showScreen("dashboard");
-    toast("Добро пожаловать назад, @" + username, "success");
+    toast("Добро пожаловать назад, @" + getCurrentUser().username, "success");
   } catch(e) {
-    showError(err, e.message || "Ошибка, попробуй ещё раз");
+    let msg = e.message || "Ошибка, попробуй ещё раз";
+    if (msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("invalid-credential"))
+      msg = "Неверный email или пароль";
+    if (msg.includes("too-many-requests"))
+      msg = "Слишком много попыток, подожди немного";
+    showError(err, msg);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "войти"; }
   }

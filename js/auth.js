@@ -1,148 +1,109 @@
 // ── AUTH MODULE ──────────────────────────────────────────────────────────────
-// Регистрация, вход, сессии.
-// Пароли хранятся как SHA-256(salt + password + salt) — не plain-text.
+// Регистрация и вход через Firebase Authentication (email + пароль).
+// Пароли хранит Firebase — мы их вообще не видим и не храним.
+// После регистрации приходит письмо с подтверждением на почту.
 
-import { getUsers, saveUser, scheduleUsersFlush } from "./firebase.js";
-
-// Соль для хэша. Меняй на свою уникальную строку, она не секретная —
-// просто делает rainbow-table атаки бесполезными.
-const SALT = "wh_4469e_s4lt_v2";
+import {
+  firebaseRegister, firebaseLogin, firebaseLogout,
+  onAuthChanged, getUsers, saveUser, scheduleUsersFlush
+} from "./firebase.js";
 
 export let currentUser = null;
 
-// ── Хэш пароля ──────────────────────────────────────────────────────────────
-export async function hashPassword(password) {
-  if (window.crypto?.subtle) {
-    try {
-      const data = new TextEncoder().encode(SALT + password + SALT);
-      const buf  = await crypto.subtle.digest("SHA-256", data);
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-    } catch(e) {}
-  }
-  // Fallback для HTTP / старых браузеров
-  let h = 5381;
-  const s = SALT + password + SALT;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h) ^ s.charCodeAt(i);
-  return "fb_" + (h >>> 0).toString(16).padStart(8, "0") + s.length.toString(16);
-}
+export function getSessionUsername()  { return localStorage.getItem("hood_username"); }
+export function setSessionUsername(u) { localStorage.setItem("hood_username", u); }
+export function clearSessionUsername(){ localStorage.removeItem("hood_username"); }
 
-// ── Сессия ──────────────────────────────────────────────────────────────────
-export function getSession()   { return localStorage.getItem("hood_session"); }
-export function setSession(u)  { localStorage.setItem("hood_session", u); }
-export function clearSession() { localStorage.removeItem("hood_session"); }
-
-// ── Регистрация ─────────────────────────────────────────────────────────────
-export async function register({ username, displayName, password }) {
-  // Валидация
-  if (!/^[a-z0-9_]{2,24}$/.test(username)) {
-    throw new Error("Имя: 2-24 символа, только a-z, 0-9, _");
-  }
-  if (!displayName.trim()) {
+// ── Регистрация ──────────────────────────────────────────────────────────────
+export async function register({ username, displayName, email, password }) {
+  if (!/^[a-z0-9_]{2,24}$/.test(username))
+    throw new Error("Ник: 2-24 символа, только a-z, 0-9, _");
+  if (!displayName.trim())
     throw new Error("Напиши своё имя");
-  }
-  if (password.length < 6) {
+  if (!email.includes("@"))
+    throw new Error("Введи корректный email");
+  if (password.length < 6)
     throw new Error("Пароль слишком короткий (мин. 6 символов)");
-  }
 
   const users = getUsers();
-  if (users[username]) {
-    throw new Error("Этот username занят");
-  }
+  if (users[username]) throw new Error("Этот ник уже занят");
+
+  const firebaseUser = await firebaseRegister(email, password);
 
   const newUser = {
-    username,
-    displayName: displayName.trim(),
-    password: await hashPassword(password),
-    bio: "",
-    avatar: "",
-    background: "default",
-    accentColor: "#c8ff00",
-    links: [],
-    music: "",
-    musicName: "",
-    likes: 0,
-    dislikes: 0,
-    comments: [],
-    createdAt: Date.now(),
-    lastSeen: Date.now()
+    username, displayName: displayName.trim(), email,
+    firebaseUid: firebaseUser.uid,
+    bio: "", avatar: "", background: "default", accentColor: "#c8ff00",
+    links: [], music: "", musicName: "",
+    likes: 0, dislikes: 0, comments: [],
+    createdAt: Date.now(), lastSeen: Date.now()
   };
 
   await saveUser(newUser);
-  currentUser = newUser;
-  setSession(username);
+  // НЕ логиним сразу — ждём подтверждения почты
   return newUser;
 }
 
-// ── Вход ─────────────────────────────────────────────────────────────────────
-export async function login({ username, password }) {
+// ── Вход ──────────────────────────────────────────────────────────────────────
+export async function login({ email, password }) {
+  const firebaseUser = await firebaseLogin(email, password);
+
   const users = getUsers();
-  const u = users[username];
+  const profile = Object.values(users).find(u => u.firebaseUid === firebaseUser.uid);
 
-  if (!u) {
-    throw new Error("Неверный username или пароль");
+  if (!profile) {
+    await firebaseLogout();
+    throw new Error("Профиль не найден. Попробуй зарегистрироваться заново.");
+  }
+  if (profile.banned) {
+    await firebaseLogout();
+    throw new Error("Этот профиль заблокирован.");
   }
 
-  // Поддержка старых хэшей (без соли) и новых (с солью)
-  const newHash = await hashPassword(password);
-
-  // Старый хэш (sha256 без соли) — для плавной миграции
-  let oldHash = "";
-  if (window.crypto?.subtle) {
-    try {
-      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-      oldHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
-    } catch(e) {}
-  }
-
-  if (u.password !== newHash && u.password !== oldHash) {
-    throw new Error("Неверный username или пароль");
-  }
-
-  // Если пароль хранился без соли — апгрейдим
-  if (u.password === oldHash && oldHash !== newHash) {
-    u.password = newHash;
-    await saveUser(u);
-  }
-
-  if (u.banned) {
-    throw new Error("Этот профиль заблокирован");
-  }
-
-  u.lastSeen = Date.now();
-  await saveUser(u);
-
-  currentUser = u;
-  setSession(username);
-  return u;
+  profile.lastSeen = Date.now();
+  await saveUser(profile);
+  currentUser = profile;
+  setSessionUsername(profile.username);
+  return profile;
 }
 
-// ── Выход ────────────────────────────────────────────────────────────────────
-export function logout() {
+// ── Выход ─────────────────────────────────────────────────────────────────────
+export async function logout() {
+  await firebaseLogout();
   currentUser = null;
-  clearSession();
+  clearSessionUsername();
 }
 
-// ── Восстановление сессии ────────────────────────────────────────────────────
+// ── Восстановление сессии ─────────────────────────────────────────────────────
 export async function restoreSession() {
-  const sess = getSession();
-  if (!sess) return null;
-
-  const users = getUsers();
-  const u = users[sess];
-  if (!u) { clearSession(); return null; }
-  if (u.banned) { clearSession(); return null; }
-
-  u.lastSeen = Date.now();
-  await saveUser(u);
-  currentUser = u;
-  return u;
+  return new Promise(resolve => {
+    onAuthChanged(async firebaseUser => {
+      if (!firebaseUser || !firebaseUser.emailVerified) {
+        currentUser = null;
+        clearSessionUsername();
+        resolve(null);
+        return;
+      }
+      const users = getUsers();
+      const profile = Object.values(users).find(u => u.firebaseUid === firebaseUser.uid);
+      if (!profile || profile.banned) {
+        await firebaseLogout();
+        currentUser = null;
+        clearSessionUsername();
+        resolve(null);
+        return;
+      }
+      profile.lastSeen = Date.now();
+      await saveUser(profile);
+      currentUser = profile;
+      setSessionUsername(profile.username);
+      resolve(profile);
+    });
+  });
 }
 
-// ── Обновить текущего пользователя ───────────────────────────────────────────
 export async function saveCurrentUser() {
   if (!currentUser) return;
-  const users = getUsers();
-  users[currentUser.username] = currentUser;
   await saveUser(currentUser);
 }
 
