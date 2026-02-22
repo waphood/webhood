@@ -6,7 +6,7 @@
 import { initFirebase, getUsers } from "./firebase.js";
 import {
   currentUser as _cu, register as _register, login as _login,
-  logout as _logout, restoreSession, hashPassword, getSession
+  logout as _logout, restoreSession, hashPassword, getSessionUsername
 } from "./auth.js";
 import { updateLandingStats } from "./landing.js";
 import { renderExplore, openUserProfile as _openUserProfile } from "./explore.js";
