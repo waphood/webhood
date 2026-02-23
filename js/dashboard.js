@@ -1,6 +1,6 @@
 // ── DASHBOARD MODULE ─────────────────────────────────────────────────────────
 
-import { getUsers, scheduleUsersFlush, saveUser, uploadMusic, deleteMusic } from "./firebase.js";
+import { getUsers, scheduleUsersFlush, saveUser } from "./firebase.js";
 import { currentUser, scheduleCurrentUserFlush } from "./auth.js";
 import { escHtml, toast } from "./utils.js";
 import { updateLandingStats } from "./landing.js";
