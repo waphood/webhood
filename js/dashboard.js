@@ -175,9 +175,7 @@ export function saveProfile() {
   currentUser.bio         = document.getElementById("userBio").value.trim();
   currentUser.accentColor = document.getElementById("accentColor").value;
 
-  const users = getUsers();
-  users[currentUser.username] = currentUser;
-  scheduleUsersFlush(users);
+  saveUser(currentUser).catch(e => console.error("saveProfile error:", e));
   toast("Сохранено", "success");
   updateLandingStats();
 }
