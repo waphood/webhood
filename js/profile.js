@@ -230,9 +230,7 @@ export function react(type) {
     sessionStorage.setItem(key, type);
   }
 
-  const users = getUsers();
-  users[u.username] = u;
-  scheduleUsersFlush(users);
+  saveUser(u).catch(e => console.error(e));
   viewingProfile = u;
   updateReactionDisplay(u);
 }
@@ -278,9 +276,7 @@ export function postComment(replyTo = null) {
     document.getElementById("commentText").value = "";
   }
 
-  const users = getUsers();
-  users[viewingProfile.username] = viewingProfile;
-  scheduleUsersFlush(users);
+  saveUser(viewingProfile).catch(e => console.error(e));
   renderComments(viewingProfile.comments);
   toast("Отправлено", "success");
   updateLandingStats();
@@ -387,9 +383,7 @@ export function togglePin(i) {
   if (!c) return;
   viewingProfile.comments.forEach((cm, j) => { if (j !== i) cm.pinned = false; });
   c.pinned = !c.pinned;
-  const users = getUsers();
-  users[viewingProfile.username] = viewingProfile;
-  scheduleUsersFlush(users);
+  saveUser(viewingProfile).catch(e => console.error(e));
   renderComments(viewingProfile.comments);
 }
 
@@ -412,9 +406,7 @@ export function reactComment(idx, type) {
   }
 
   u.comments[idx] = c;
-  const users = getUsers();
-  users[u.username] = u;
-  scheduleUsersFlush(users);
+  saveUser(u).catch(e => console.error(e));
   viewingProfile = u;
   renderComments(u.comments);
 }
