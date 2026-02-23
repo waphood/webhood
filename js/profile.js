@@ -53,7 +53,7 @@ export function showProfileView(user) {
     if (users[user.username]) {
       users[user.username].views = (users[user.username].views || 0) + 1;
       user.views = users[user.username].views;
-      scheduleUsersFlush(users);
+      saveUser(users[user.username]).catch(e => console.error(e));
     }
   }
 
