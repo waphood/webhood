@@ -109,7 +109,5 @@ export async function saveCurrentUser() {
 
 export function scheduleCurrentUserFlush() {
   if (!currentUser) return;
-  const users = getUsers();
-  users[currentUser.username] = currentUser;
-  scheduleUsersFlush(users);
+  saveUser(currentUser).catch(e => console.error("scheduleCurrentUserFlush error:", e));
 }
