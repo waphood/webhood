@@ -2,7 +2,7 @@
 // Панель администратора. Пароль проверяется через хэш с солью.
 // Хэш хранится в коде, но с солью — rainbow tables бесполезны.
 
-import { getUsers, scheduleUsersFlush, getBadges, saveBadges } from "./firebase.js";
+import { getUsers, scheduleUsersFlush, getBadges, saveBadges, saveUser } from "./firebase.js";
 import { escHtml, toast } from "./utils.js";
 import { currentUser, logout } from "./auth.js";
 import { viewingProfile, updateReactionDisplay, renderComments } from "./profile.js";
@@ -185,7 +185,7 @@ export function adminDeleteComment(username, idx) {
   if (!u || !u.comments) return;
   u.comments.splice(idx, 1);
   users[username] = u;
-  scheduleUsersFlush(users);
+  saveUser(u).catch(e => console.error(e));
   if (viewingProfile?.username === username) {
     Object.assign(viewingProfile, u);
     renderComments(u.comments);
