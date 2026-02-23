@@ -17,7 +17,7 @@ import { updateLandingStats } from "./landing.js";
 //    console.log(Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join(""))
 // 3. Замени ADMIN_HASH ниже на полученный хэш.
 const ADMIN_SALT = "wh_admin_s4lt_v2";
-const ADMIN_HASH = "ЗАМЕНИ_НА_СВОЙ_ХЭШ"; // см. инструкцию выше
+const ADMIN_HASH = "73274a70eb3302468c50e70e9ee5c0f95e713f17ae319dcea1670353828d5563"; // см. инструкцию выше
 
 let _adminOpen = false;
 
