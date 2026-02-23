@@ -1,6 +1,6 @@
 // ── PROFILE MODULE ───────────────────────────────────────────────────────────
 
-import { getUsers, getBadges, scheduleUsersFlush } from "./firebase.js";
+import { getUsers, getBadges, scheduleUsersFlush, saveUser } from "./firebase.js";
 import { currentUser } from "./auth.js";
 import { escHtml, timeAgo, toast, fmtTime } from "./utils.js";
 import { updateLandingStats } from "./landing.js";
